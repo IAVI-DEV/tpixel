@@ -1,0 +1,136 @@
+"""HIV-aware panel builder for PIXEL plots.
+
+Handles HxB2 coordinate mapping, Env region annotations, PNGS markers,
+and animal-based sequence grouping from SHIV/HIV aligned FASTA files.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from pathlib import Path
+
+from tpixel.fasta import read_fasta
+from tpixel.hxb2 import build_hxb2_map, hxb2_col_labels, hxb2_regions
+from tpixel.models import Marker, Panel, SeqGroup
+from tpixel.pngs import find_pngs_markers
+
+
+def _find_ref_id(names: list[str]) -> str | None:
+    """Find the parental reference (name ending with '_ref')."""
+    for name in names:
+        if name.endswith("_ref"):
+            return name
+    return None
+
+
+def _extract_animal(seq_id: str) -> str:
+    """Extract animal name from sequence ID (prefix before first '_')."""
+    parts = seq_id.split("_")
+    return parts[0]
+
+
+def _sort_animal_groups(animal_names: list[str], lineage: str) -> list[str]:
+    """Sort: lineage self first, recombinants, then alphabetical."""
+    self_group = []
+    rec_group = []
+    other_group = []
+    for name in animal_names:
+        if name == lineage:
+            self_group.append(name)
+        elif name.lower().startswith("rec"):
+            rec_group.append(name)
+        else:
+            other_group.append(name)
+    return self_group + sorted(rec_group) + sorted(other_group)
+
+
+def hiv_panel(
+    path: str | Path,
+    hxb2_id: str = "HxB2",
+    ref_id: str | None = None,
+    tick_step: int = 50,
+    ref_positions: list[int] | None = None,
+) -> Panel:
+    """Build a full Roark-style Panel from an HIV Env protein alignment.
+
+    Args:
+        path: Path to aligned protein FASTA containing HxB2 and a *_ref sequence.
+        hxb2_id: ID of the HxB2 coordinate reference in the alignment.
+        ref_id: Parental reference ID. Auto-detected (*_ref) if None.
+            Ignored when ref_positions is provided.
+        tick_step: HxB2 AA position interval for x-axis ticks.
+        ref_positions: 1-based positions of reference sequences. Last is
+            the primary reference; earlier ones become extra reference rows.
+            Defaults to [1, 2].
+
+    Returns:
+        Panel with regions, PNGS markers, grouped sequences, and HxB2 ticks.
+    """
+    seqs = read_fasta(path)
+    if not seqs:
+        raise ValueError(f"No sequences in {path}")
+
+    names = [n for n, _ in seqs]
+    seq_dict = {n: s for n, s in seqs}
+
+    if ref_positions is not None:
+        # Position-based: last position is primary reference
+        primary_idx = ref_positions[-1] - 1
+        ref_id = names[primary_idx]
+    else:
+        # Name-based auto-detection (original behavior)
+        ref_positions = [1, 2]
+        if ref_id is None:
+            ref_id = _find_ref_id(names)
+        if ref_id is None:
+            raise ValueError("No *_ref sequence found. Specify ref_id explicitly.")
+        if ref_id not in seq_dict:
+            raise ValueError(f"Reference '{ref_id}' not in alignment")
+
+    ref_seq = seq_dict[ref_id]
+    aln_len = len(ref_seq)
+    ref_row = list(ref_seq.upper())
+
+    hxb2_map = build_hxb2_map(seqs, hxb2_id)
+    regions = hxb2_regions(hxb2_map)
+    col_labels = hxb2_col_labels(hxb2_map, step=tick_step)
+    markers = find_pngs_markers(ref_seq, hxb2_map)
+
+    lineage = ref_id.replace("_ref", "") if ref_id.endswith("_ref") else ref_id
+
+    # Extra reference rows: all ref positions except the last
+    extra_ref_rows: list[tuple[str, list[str]]] = []
+    for pos in ref_positions[:-1]:
+        idx = pos - 1
+        name = names[idx]
+        seq = seq_dict[name]
+        row = list(seq.upper()[:aln_len])
+        row += ["-"] * (aln_len - len(row))
+        extra_ref_rows.append((name, row))
+
+    # Group sample sequences by animal
+    skip = {names[pos - 1] for pos in ref_positions}
+    animal_seqs: dict[str, list[tuple[str, list[str]]]] = defaultdict(list)
+    for name, seq in seqs:
+        if name in skip:
+            continue
+        animal = _extract_animal(name)
+        row = list(seq.upper()[:aln_len])
+        row += ["-"] * (aln_len - len(row))
+        animal_seqs[animal].append((name, row))
+
+    sorted_animals = _sort_animal_groups(list(animal_seqs.keys()), lineage)
+    groups = [SeqGroup(name=a, seqs=animal_seqs[a]) for a in sorted_animals]
+
+    return Panel(
+        label=ref_id,
+        ref_row=ref_row,
+        seq_rows=[],
+        total_cols=aln_len,
+        col_labels=col_labels,
+        regions=regions,
+        markers=markers,
+        marker_color="#4CAF50",
+        groups=groups,
+        extra_ref_rows=extra_ref_rows,
+    )
