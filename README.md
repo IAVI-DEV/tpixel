@@ -5,7 +5,7 @@ Pixel-block alignment viewer for hundreds of sequences. Renders Roark-style PIXE
 ## Install
 
 ```bash
-pip install -e .
+pip install tpixel
 ```
 
 ## Usage
@@ -40,10 +40,10 @@ Both alignments contain the same 33 sequences (HxB2, animal1_ref, and 31 sample 
 
 `env_protein_aligned.fasta` — 887 columns of HIV-1 Env protein. Each AA = 1 pixel.
 
-![PIXEL plot — protein](examples/test_hiv_pixel.png)
+![PIXEL plot — protein](https://raw.githubusercontent.com/tmsincomb/tpixel/main/examples/test_hiv_pixel.png)
 
 ### Nucleotide alignment (NT)
 
 `env_codon_aligned.fasta` — 2661 columns of codon-aligned HIV-1 Env DNA. Each NT = 1 pixel. PNGS markers are detected by translating internally and mapped back to NT columns.
 
-![PIXEL plot — nucleotide](examples/test_hiv_nt_pixel.png)
+![PIXEL plot — nucleotide](https://raw.githubusercontent.com/tmsincomb/tpixel/main/examples/test_hiv_nt_pixel.png)
