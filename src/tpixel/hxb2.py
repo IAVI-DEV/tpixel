@@ -47,11 +47,38 @@ for _name, _start, _end in ENV_REGIONS:
 
 
 def get_env_region(hxb2_aa_pos: int) -> str | None:
+    """Return the Env region name for an HxB2 amino acid position.
+
+    Args:
+        hxb2_aa_pos: 1-based HxB2 amino acid position.
+
+    Returns:
+        Region name (e.g. ``'V3'``) or ``None`` if outside known boundaries.
+
+    Examples:
+        >>> get_env_region(1)
+        'SP'
+        >>> get_env_region(131)
+        'V1'
+        >>> get_env_region(296)
+        'V3'
+        >>> get_env_region(900) is None
+        True
+    """
     return _REGION_LOOKUP.get(hxb2_aa_pos)
 
 
 @dataclass
 class HxB2Position:
+    """A single alignment column mapped to HxB2 coordinates.
+
+    Attributes:
+        alignment_col: 0-based alignment column index.
+        hxb2_aa_pos: 1-based HxB2 amino acid position, or ``None`` for gaps.
+        region: Env region name (e.g. ``'V3'``), or ``None``.
+        hxb2_residue: The residue character at this column in the HxB2 sequence.
+    """
+
     alignment_col: int
     hxb2_aa_pos: int | None
     region: str | None
@@ -59,7 +86,18 @@ class HxB2Position:
 
 
 def _is_nucleotide(seq: str) -> bool:
-    """Return True if *seq* looks like a nucleotide sequence."""
+    """Return True if *seq* looks like a nucleotide sequence.
+
+    Examples:
+        >>> _is_nucleotide("ACGTACGT")
+        True
+        >>> _is_nucleotide("MWLK")
+        False
+        >>> _is_nucleotide("ACG-T.NU")
+        True
+        >>> _is_nucleotide("")
+        True
+    """
     nt_chars = set("ACGTUNacgtun-.")
     return all(c in nt_chars for c in seq)
 

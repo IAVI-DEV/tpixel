@@ -21,7 +21,7 @@ def write_fasta(tmp_path):
 
     def _write(seqs: list[tuple[str, str]], name: str = "test.fasta") -> Path:
         path = tmp_path / name
-        with open(path, "w") as fh:
+        with open(path, "w", encoding="utf-8") as fh:
             for seq_name, seq in seqs:
                 fh.write(f">{seq_name}\n{seq}\n")
         return path

@@ -88,13 +88,30 @@ class Panel:
 
     @property
     def total_seqs(self) -> int:
+        """Total number of sequences across all groups or flat rows.
+
+        Examples:
+            >>> Panel("t", ["A"], [("s1", ["A"]), ("s2", ["A"])], 1, []).total_seqs
+            2
+            >>> Panel("t", ["A"], [], 1, [], groups=[SeqGroup("g", [("s1", ["A"])])]).total_seqs
+            1
+        """
         if self.groups:
             return sum(len(g.seqs) for g in self.groups)
         return len(self.seq_rows)
 
     @property
     def seq_type(self) -> str:
-        """Detect sequence type from the reference row: 'AA' or 'NT'."""
+        """Detect sequence type from the reference row: 'AA' or 'NT'.
+
+        Examples:
+            >>> Panel("t", list("ACGTACGT"), [], 8, []).seq_type
+            'NT'
+            >>> Panel("t", list("MWLKFHRD"), [], 8, []).seq_type
+            'AA'
+            >>> Panel("t", list("ACG-T.NU"), [], 8, []).seq_type
+            'NT'
+        """
         nt_chars = set("ACGTUNacgtun-.")
         for base in self.ref_row:
             if base not in nt_chars:
@@ -103,7 +120,17 @@ class Panel:
 
     @property
     def effective_groups(self) -> list[SeqGroup]:
-        """Return groups for rendering; wraps flat seq_rows if no groups set."""
+        """Return groups for rendering; wraps flat seq_rows if no groups set.
+
+        Examples:
+            >>> p = Panel("t", ["A"], [("s1", ["A"])], 1, [])
+            >>> len(p.effective_groups)
+            1
+            >>> p.effective_groups[0].name
+            ''
+            >>> Panel("t", ["A"], [], 1, []).effective_groups
+            []
+        """
         if self.groups:
             return self.groups
         if self.seq_rows:

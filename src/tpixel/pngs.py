@@ -37,6 +37,22 @@ def translate(nt_seq: str) -> str:
 
     Codons containing ambiguous bases (e.g. ``N``) are rendered as ``X``.
     A trailing incomplete codon is silently ignored.
+
+    Args:
+        nt_seq: Ungapped nucleotide sequence string.
+
+    Returns:
+        Translated protein sequence.
+
+    Examples:
+        >>> translate("ATGAATGCTTCT")
+        'MNAS'
+        >>> translate("ATGNNN")
+        'MX'
+        >>> translate("ATG")
+        'M'
+        >>> translate("ATGA")
+        'M'
     """
     protein: list[str] = []
     seq = nt_seq.upper().replace("U", "T")
@@ -49,7 +65,21 @@ def translate(nt_seq: str) -> str:
 def find_pngs_in_sequence(ungapped_seq: str) -> list[int]:
     """Find PNGS motifs (N-X-S/T, X!=P) in an ungapped protein sequence.
 
-    Returns 0-based positions of the N residue.
+    Args:
+        ungapped_seq: Ungapped protein sequence string.
+
+    Returns:
+        0-based positions of the N residue in each PNGS motif.
+
+    Examples:
+        >>> find_pngs_in_sequence("NAS")
+        [0]
+        >>> find_pngs_in_sequence("NAT")
+        [0]
+        >>> find_pngs_in_sequence("NPS")
+        []
+        >>> find_pngs_in_sequence("MNASNPS")
+        [1]
     """
     sites: list[int] = []
     for i in range(len(ungapped_seq) - 2):
@@ -61,7 +91,22 @@ def find_pngs_in_sequence(ungapped_seq: str) -> list[int]:
 
 
 def _ungapped_to_alignment_map(aligned_seq: str) -> list[int]:
-    """Map ungapped positions to alignment column indices."""
+    """Map ungapped positions to alignment column indices.
+
+    Args:
+        aligned_seq: Aligned sequence string (may contain ``-`` gaps).
+
+    Returns:
+        List of column indices for non-gap positions.
+
+    Examples:
+        >>> _ungapped_to_alignment_map("A-C-G")
+        [0, 2, 4]
+        >>> _ungapped_to_alignment_map("ACG")
+        [0, 1, 2]
+        >>> _ungapped_to_alignment_map("---")
+        []
+    """
     return [col for col, res in enumerate(aligned_seq) if res != "-"]
 
 

@@ -16,7 +16,20 @@ from tpixel.pngs import find_pngs_markers, find_pngs_markers_nt
 
 
 def _find_ref_id(names: list[str]) -> str | None:
-    """Find the parental reference (name ending with '_ref')."""
+    """Find the parental reference (name ending with ``'_ref'``).
+
+    Args:
+        names: Sequence IDs from the alignment.
+
+    Returns:
+        First name ending with ``'_ref'``, or ``None``.
+
+    Examples:
+        >>> _find_ref_id(["HxB2", "animal1_ref", "animal1_s1"])
+        'animal1_ref'
+        >>> _find_ref_id(["HxB2", "s1", "s2"]) is None
+        True
+    """
     for name in names:
         if name.endswith("_ref"):
             return name
@@ -24,13 +37,42 @@ def _find_ref_id(names: list[str]) -> str | None:
 
 
 def _extract_animal(seq_id: str) -> str:
-    """Extract animal name from sequence ID (prefix before first '_')."""
+    """Extract animal name from sequence ID (prefix before first ``'_'``).
+
+    Args:
+        seq_id: Full sequence identifier string.
+
+    Returns:
+        The portion of *seq_id* before the first underscore.
+
+    Examples:
+        >>> _extract_animal("animal1_s1")
+        'animal1'
+        >>> _extract_animal("RM5695_env_s3")
+        'RM5695'
+        >>> _extract_animal("nounderscore")
+        'nounderscore'
+    """
     parts = seq_id.split("_")
     return parts[0]
 
 
 def _sort_animal_groups(animal_names: list[str], lineage: str) -> list[str]:
-    """Sort: lineage self first, recombinants, then alphabetical."""
+    """Sort: lineage self first, recombinants, then alphabetical.
+
+    Args:
+        animal_names: Unique animal/group names to sort.
+        lineage: The lineage name to place first.
+
+    Returns:
+        Sorted list: lineage first, then recombinants, then others alphabetically.
+
+    Examples:
+        >>> _sort_animal_groups(["B", "rec1", "A", "lin1"], "lin1")
+        ['lin1', 'rec1', 'A', 'B']
+        >>> _sort_animal_groups(["X", "Y"], "Z")
+        ['X', 'Y']
+    """
     self_group = []
     rec_group = []
     other_group = []

@@ -19,7 +19,7 @@ def read_fasta(path: str | Path) -> list[tuple[str, str]]:
     seqs: list[tuple[str, str]] = []
     name: str | None = None
     buf: list[str] = []
-    with open(path) as fh:
+    with open(path, encoding="utf-8") as fh:
         for line in fh:
             if line.startswith(">"):
                 if name is not None:

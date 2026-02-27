@@ -9,14 +9,34 @@ from tpixel.renderer import render_panels
 
 
 def _expand_stdin(paths: list[str]) -> list[str]:
-    """If paths is ['-'], read file paths from stdin (one per line)."""
+    """If paths is ``['-']``, read file paths from stdin (one per line).
+
+    Args:
+        paths: List of file path strings. A single ``'-'`` triggers stdin reading.
+
+    Returns:
+        Expanded list of file paths.
+
+    Examples:
+        >>> _expand_stdin(["file1.fasta", "file2.fasta"])
+        ['file1.fasta', 'file2.fasta']
+        >>> _expand_stdin([])
+        []
+    """
     if paths and len(paths) == 1 and paths[0] == "-":
         return [line.strip() for line in sys.stdin if line.strip()]
     return list(paths)
 
 
 def _auto_detect_hiv(fasta_path: str) -> bool:
-    """Check if alignment contains HxB2 and a *_ref sequence."""
+    """Check if alignment contains HxB2 and a ``*_ref`` sequence.
+
+    Args:
+        fasta_path: Path to the aligned FASTA file.
+
+    Returns:
+        ``True`` if both HxB2 and a ``*_ref`` sequence are present.
+    """
     seqs = read_fasta(fasta_path)
     names = {n.split()[0] for n, _ in seqs}
     has_hxb2 = "HxB2" in names
