@@ -381,3 +381,220 @@ class TestPanel:
     def test_seq_type_nt_with_gaps(self):
         p = Panel("t", list("ACG-T.NU"), [], 8, [])
         assert p.seq_type == "NT"
+
+
+class TestHxB2NTMapping:
+    """Test nucleotide-aware HxB2 coordinate mapping."""
+
+    def test_nt_codon_aa_positions(self):
+        """9-NT HxB2 seq → AA positions [1,1,1,2,2,2,3,3,3]."""
+        from tpixel.hxb2 import build_hxb2_map
+
+        seqs = [("HxB2", "ACGACGACG")]
+        hxb2_map = build_hxb2_map(seqs, seq_type="NT")
+        aa_positions = [p.hxb2_aa_pos for p in hxb2_map]
+        assert aa_positions == [1, 1, 1, 2, 2, 2, 3, 3, 3]
+
+    def test_nt_gaps_skipped(self):
+        """Gaps in the HxB2 NT sequence get None for aa_pos."""
+        from tpixel.hxb2 import build_hxb2_map
+
+        seqs = [("HxB2", "ACG---ACG")]
+        hxb2_map = build_hxb2_map(seqs, seq_type="NT")
+        aa_positions = [p.hxb2_aa_pos for p in hxb2_map]
+        assert aa_positions == [1, 1, 1, None, None, None, 2, 2, 2]
+
+    def test_nt_autodetect(self):
+        """Auto-detect NT from HxB2 sequence characters."""
+        from tpixel.hxb2 import build_hxb2_map
+
+        # 9 NTs → 3 full codons, aa_pos = (nt_counter-1)//3 + 1
+        seqs = [("HxB2", "ACGTACGTA")]
+        hxb2_map = build_hxb2_map(seqs, seq_type=None)
+        # Should auto-detect as NT and assign codon-based positions
+        aa_positions = [p.hxb2_aa_pos for p in hxb2_map]
+        assert aa_positions == [1, 1, 1, 2, 2, 2, 3, 3, 3]
+
+    def test_aa_mode_unchanged(self):
+        """AA mode still counts one residue = one AA position."""
+        from tpixel.hxb2 import build_hxb2_map
+
+        seqs = [("HxB2", "MWLK")]
+        hxb2_map = build_hxb2_map(seqs, seq_type="AA")
+        aa_positions = [p.hxb2_aa_pos for p in hxb2_map]
+        assert aa_positions == [1, 2, 3, 4]
+
+    def test_region_boundaries_at_codon_edges(self):
+        """Regions assigned via AA position from codon-level counting."""
+        from tpixel.hxb2 import build_hxb2_map
+
+        # Build a 90-NT HxB2 sequence → 30 AA positions → all in SP region (1-30)
+        nt_seq = "ACG" * 30  # 30 codons = AA positions 1-30
+        seqs = [("HxB2", nt_seq)]
+        hxb2_map = build_hxb2_map(seqs, seq_type="NT")
+        # Last three NTs map to AA pos 30 → SP region
+        for p in hxb2_map[-3:]:
+            assert p.region == "SP"
+
+
+class TestPNGSFromNT:
+    """Test PNGS detection from nucleotide sequences."""
+
+    def test_translate_basic(self):
+        from tpixel.pngs import translate
+
+        # ATG=M, AAT=N, GCT=A, TCT=S
+        assert translate("ATGAATGCTTCT") == "MNAS"
+
+    def test_translate_with_ambiguity(self):
+        from tpixel.pngs import translate
+
+        # NNN is ambiguous → X
+        assert translate("ATGNNN") == "MX"
+
+    def test_find_pngs_markers_nt(self):
+        """NXS motif: AAT(N) GCT(A) TCT(S) → PNGS at AA pos 0."""
+        from tpixel.pngs import find_pngs_markers_nt
+
+        # Protein: N A S → PNGS at position 0
+        nt_ref = "AATGCTTCT"
+        markers = find_pngs_markers_nt(nt_ref)
+        assert len(markers) == 1
+        assert markers[0].col == 0  # first NT of the N codon
+        assert markers[0].label == "N1"  # 0-based AA pos + 1
+
+    def test_find_pngs_markers_nt_with_gaps(self):
+        """Gaps in the NT alignment should not affect PNGS detection."""
+        from tpixel.pngs import find_pngs_markers_nt
+
+        # Insert gaps before the NAS codons
+        nt_ref = "---AATGCTTCT"
+        markers = find_pngs_markers_nt(nt_ref)
+        assert len(markers) == 1
+        assert markers[0].col == 3  # column 3 (after 3 gap columns)
+
+    def test_find_pngs_markers_nt_with_hxb2_labels(self):
+        """PNGS markers get HxB2 AA position labels when map is provided."""
+        from tpixel.hxb2 import build_hxb2_map
+        from tpixel.pngs import find_pngs_markers_nt
+
+        # HxB2 and ref are the same NT sequence: N A S
+        nt_seq = "AATGCTTCT"
+        seqs = [("HxB2", nt_seq)]
+        hxb2_map = build_hxb2_map(seqs, seq_type="NT")
+        markers = find_pngs_markers_nt(nt_seq, hxb2_map)
+        assert len(markers) == 1
+        # Column 0 maps to HxB2 AA pos 1
+        assert markers[0].label == "N1"
+
+    def test_no_pngs_when_x_is_proline(self):
+        """NPS motif should NOT be detected as PNGS."""
+        from tpixel.pngs import find_pngs_markers_nt
+
+        # AAT=N, CCT=P, TCT=S → NPS, not a valid PNGS
+        nt_ref = "AATCCTTCT"
+        markers = find_pngs_markers_nt(nt_ref)
+        assert len(markers) == 0
+
+
+class TestNTRendering:
+    """Test that NT HIV panels build and render successfully."""
+
+    def test_nt_hiv_panel_builds(self, write_fasta):
+        """NT HIV panel builds without errors."""
+        from tpixel.hiv import hiv_panel
+
+        # Build minimal NT HIV alignment (30 codons = 90 NT per sequence)
+        hxb2_nt = "ACGTACGTAC" * 9  # 90 NT
+        ref_nt = "ACGTACGTAC" * 9
+        s1_nt = list(ref_nt)
+        s1_nt[3] = "A"  # substitution
+        s1_nt = "".join(s1_nt)
+
+        seqs = [
+            ("HxB2", hxb2_nt),
+            ("animal1_ref", ref_nt),
+            ("animal1_s1", s1_nt),
+        ]
+        path = write_fasta(seqs, "nt_hiv.fasta")
+        panel = hiv_panel(str(path))
+        assert panel.total_cols == 90
+
+    def test_nt_hiv_panel_renders_png(self, write_fasta, output_dir):
+        """NT HIV panel renders to PNG without errors."""
+        from tpixel.hiv import hiv_panel
+        from tpixel.renderer import render_panels
+
+        hxb2_nt = "ACGTACGTAC" * 9
+        ref_nt = "ACGTACGTAC" * 9
+        s1_nt = list(ref_nt)
+        s1_nt[3] = "A"
+        s1_nt = "".join(s1_nt)
+        s2_nt = list(ref_nt)
+        s2_nt[6] = "A"
+        s2_nt = "".join(s2_nt)
+
+        seqs = [
+            ("HxB2", hxb2_nt),
+            ("animal1_ref", ref_nt),
+            ("animal1_s1", s1_nt),
+            ("animal2_s1", s2_nt),
+        ]
+        path = write_fasta(seqs, "nt_hiv_render.fasta")
+        panel = hiv_panel(str(path))
+        out = output_dir / "nt_hiv_panel.png"
+        render_panels([panel], str(out), dpi=150)
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+    def test_autodetect_nt_fasta(self, write_fasta):
+        """Auto-detect correctly identifies NT FASTA as NT."""
+        from tpixel.hiv import hiv_panel
+
+        hxb2_nt = "ACGTACGTAC" * 9
+        ref_nt = "ACGTACGTAC" * 9
+        s1_nt = "ACCTACGTAC" * 9
+
+        seqs = [
+            ("HxB2", hxb2_nt),
+            ("animal1_ref", ref_nt),
+            ("animal1_s1", s1_nt),
+        ]
+        path = write_fasta(seqs, "autodetect_nt.fasta")
+        panel = hiv_panel(str(path))
+        assert panel.seq_type == "NT"
+
+    def test_autodetect_aa_fasta(self, write_fasta):
+        """Auto-detect correctly identifies AA FASTA as AA."""
+        from tpixel.hiv import hiv_panel
+
+        # Use amino acid characters that aren't ACGTU
+        hxb2_aa = "MWLKFHRD" * 5
+        ref_aa = "MWLKFHRD" * 5
+        s1_aa = "MWLKFHRE" * 5
+
+        seqs = [
+            ("HxB2", hxb2_aa),
+            ("animal1_ref", ref_aa),
+            ("animal1_s1", s1_aa),
+        ]
+        path = write_fasta(seqs, "autodetect_aa.fasta")
+        panel = hiv_panel(str(path))
+        assert panel.seq_type == "AA"
+
+    def test_forced_nt_mode(self, write_fasta):
+        """Explicit seq_type='NT' overrides auto-detection."""
+        from tpixel.hiv import hiv_panel
+
+        hxb2_nt = "ACGTACGTAC" * 9
+        ref_nt = "ACGTACGTAC" * 9
+        s1_nt = "ACCTACGTAC" * 9
+
+        seqs = [
+            ("HxB2", hxb2_nt),
+            ("animal1_ref", ref_nt),
+            ("animal1_s1", s1_nt),
+        ]
+        path = write_fasta(seqs, "forced_nt.fasta")
+        panel = hiv_panel(str(path), seq_type="NT")
+        assert panel.seq_type == "NT"

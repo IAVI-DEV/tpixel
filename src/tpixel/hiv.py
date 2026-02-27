@@ -10,9 +10,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from tpixel.fasta import read_fasta
-from tpixel.hxb2 import build_hxb2_map, hxb2_col_labels, hxb2_regions
+from tpixel.hxb2 import _is_nucleotide, build_hxb2_map, hxb2_col_labels, hxb2_regions
 from tpixel.models import Marker, Panel, SeqGroup
-from tpixel.pngs import find_pngs_markers
+from tpixel.pngs import find_pngs_markers, find_pngs_markers_nt
 
 
 def _find_ref_id(names: list[str]) -> str | None:
@@ -50,11 +50,13 @@ def hiv_panel(
     ref_id: str | None = None,
     tick_step: int = 50,
     ref_positions: list[int] | None = None,
+    seq_type: str | None = None,
 ) -> Panel:
-    """Build a full Roark-style Panel from an HIV Env protein alignment.
+    """Build a full Roark-style Panel from an HIV Env alignment.
 
     Args:
-        path: Path to aligned protein FASTA containing HxB2 and a *_ref sequence.
+        path: Path to aligned FASTA containing HxB2 and a *_ref sequence.
+            Accepts both amino-acid and nucleotide alignments.
         hxb2_id: ID of the HxB2 coordinate reference in the alignment.
         ref_id: Parental reference ID. Auto-detected (*_ref) if None.
             Ignored when ref_positions is provided.
@@ -62,6 +64,8 @@ def hiv_panel(
         ref_positions: 1-based positions of reference sequences. Last is
             the primary reference; earlier ones become extra reference rows.
             Defaults to [1, 2].
+        seq_type: ``"NT"`` or ``"AA"``.  Auto-detected from the reference
+            sequence when *None*.
 
     Returns:
         Panel with regions, PNGS markers, grouped sequences, and HxB2 ticks.
@@ -91,10 +95,18 @@ def hiv_panel(
     aln_len = len(ref_seq)
     ref_row = list(ref_seq.upper())
 
-    hxb2_map = build_hxb2_map(seqs, hxb2_id)
+    # Auto-detect sequence type from reference when not specified
+    if seq_type is None:
+        seq_type = "NT" if _is_nucleotide(ref_seq) else "AA"
+
+    hxb2_map = build_hxb2_map(seqs, hxb2_id, seq_type=seq_type)
     regions = hxb2_regions(hxb2_map)
     col_labels = hxb2_col_labels(hxb2_map, step=tick_step)
-    markers = find_pngs_markers(ref_seq, hxb2_map)
+
+    if seq_type == "NT":
+        markers = find_pngs_markers_nt(ref_seq, hxb2_map)
+    else:
+        markers = find_pngs_markers(ref_seq, hxb2_map)
 
     lineage = ref_id.replace("_ref", "") if ref_id.endswith("_ref") else ref_id
 

@@ -56,6 +56,11 @@ def _auto_detect_hiv(fasta_path: str) -> bool:
     help="Force HIV mode (HxB2 regions, PNGS, animal grouping). Auto-detected if omitted.",
 )
 @click.option(
+    "--nt/--aa",
+    default=None,
+    help="Force nucleotide or amino-acid mode. Auto-detected if omitted.",
+)
+@click.option(
     "--ref-pos",
     default="1,2",
     show_default=True,
@@ -67,7 +72,7 @@ def _auto_detect_hiv(fasta_path: str) -> bool:
     default=None,
     help="Title displayed above the plot.",
 )
-def main(fasta, columns, output, dpi, cell, hiv, ref_pos, title):
+def main(fasta, columns, output, dpi, cell, hiv, nt, ref_pos, title):
     """Pixel-block alignment viewer for hundreds of sequences.
 
     Renders Roark-style PIXEL plots: grey=match, red=substitution, black=gap.
@@ -96,7 +101,12 @@ def main(fasta, columns, output, dpi, cell, hiv, ref_pos, title):
         if use_hiv:
             from tpixel.hiv import hiv_panel
 
-            panel = hiv_panel(fasta_path, ref_positions=ref_positions)
+            seq_type = None
+            if nt is True:
+                seq_type = "NT"
+            elif nt is False:
+                seq_type = "AA"
+            panel = hiv_panel(fasta_path, ref_positions=ref_positions, seq_type=seq_type)
         else:
             panel = fasta_panel(fasta_path, col_start, col_end, ref_positions=ref_positions)
 

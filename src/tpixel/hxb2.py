@@ -58,12 +58,24 @@ class HxB2Position:
     hxb2_residue: str
 
 
-def build_hxb2_map(aligned_seqs: list[tuple[str, str]], hxb2_id: str = "HxB2") -> list[HxB2Position]:
+def _is_nucleotide(seq: str) -> bool:
+    """Return True if *seq* looks like a nucleotide sequence."""
+    nt_chars = set("ACGTUNacgtun-.")
+    return all(c in nt_chars for c in seq)
+
+
+def build_hxb2_map(
+    aligned_seqs: list[tuple[str, str]],
+    hxb2_id: str = "HxB2",
+    seq_type: str | None = None,
+) -> list[HxB2Position]:
     """Walk the HxB2 row and map every alignment column to HxB2 coordinates.
 
     Args:
         aligned_seqs: List of (name, sequence) from read_fasta.
         hxb2_id: Sequence ID of HxB2 in the alignment.
+        seq_type: ``"NT"`` or ``"AA"``.  Auto-detected from the HxB2
+            sequence when *None*.
 
     Returns:
         One HxB2Position per alignment column.
@@ -77,15 +89,26 @@ def build_hxb2_map(aligned_seqs: list[tuple[str, str]], hxb2_id: str = "HxB2") -
     if hxb2_seq is None:
         raise ValueError(f"HxB2 sequence '{hxb2_id}' not found in alignment")
 
+    if seq_type is None:
+        seq_type = "NT" if _is_nucleotide(hxb2_seq) else "AA"
+
+    is_nt = seq_type == "NT"
+
     positions: list[HxB2Position] = []
+    nt_counter = 0
     aa_counter = 0
 
     for col_idx, residue in enumerate(hxb2_seq):
-        if residue == "-":
-            positions.append(HxB2Position(col_idx, None, None, "-"))
+        if residue in ("-", "."):
+            positions.append(HxB2Position(col_idx, None, None, residue))
         else:
-            aa_counter += 1
-            positions.append(HxB2Position(col_idx, aa_counter, get_env_region(aa_counter), residue))
+            if is_nt:
+                nt_counter += 1
+                aa_pos = (nt_counter - 1) // 3 + 1
+            else:
+                aa_counter += 1
+                aa_pos = aa_counter
+            positions.append(HxB2Position(col_idx, aa_pos, get_env_region(aa_pos), residue))
 
     return positions
 
