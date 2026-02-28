@@ -11,32 +11,32 @@ from dataclasses import dataclass
 from tpixel.models import Region
 
 ENV_REGIONS: list[tuple[str, int, int]] = [
-    ("SP",    1,  30),
-    ("C1",   31, 130),
-    ("V1",  131, 157),
-    ("V2",  158, 196),
-    ("C2",  197, 295),
-    ("V3",  296, 331),
-    ("C3",  332, 384),
-    ("V4",  385, 418),
-    ("C4",  419, 459),
-    ("V5",  460, 469),
-    ("C5",  470, 511),
+    ("SP", 1, 30),
+    ("C1", 31, 130),
+    ("V1", 131, 157),
+    ("V2", 158, 196),
+    ("C2", 197, 295),
+    ("V3", 296, 331),
+    ("C3", 332, 384),
+    ("V4", 385, 418),
+    ("C4", 419, 459),
+    ("V5", 460, 469),
+    ("C5", 470, 511),
     ("gp41", 512, 856),
 ]
 
 REGION_COLORS: dict[str, str] = {
-    "SP":   "#FFF9C4",
-    "C1":   "#EEEEEE",
-    "V1":   "#BBDEFB",
-    "V2":   "#BBDEFB",
-    "C2":   "#EEEEEE",
-    "V3":   "#BBDEFB",
-    "C3":   "#EEEEEE",
-    "V4":   "#BBDEFB",
-    "C4":   "#EEEEEE",
-    "V5":   "#BBDEFB",
-    "C5":   "#EEEEEE",
+    "SP": "#FFF9C4",
+    "C1": "#EEEEEE",
+    "V1": "#BBDEFB",
+    "V2": "#BBDEFB",
+    "C2": "#EEEEEE",
+    "V3": "#BBDEFB",
+    "C3": "#EEEEEE",
+    "V4": "#BBDEFB",
+    "C4": "#EEEEEE",
+    "V5": "#BBDEFB",
+    "C5": "#EEEEEE",
     "gp41": "#F8BBD0",
 }
 
@@ -85,17 +85,17 @@ class HxB2Position:
     hxb2_residue: str
 
 
-def _is_nucleotide(seq: str) -> bool:
+def is_nucleotide(seq: str) -> bool:
     """Return True if *seq* looks like a nucleotide sequence.
 
     Examples:
-        >>> _is_nucleotide("ACGTACGT")
+        >>> is_nucleotide("ACGTACGT")
         True
-        >>> _is_nucleotide("MWLK")
+        >>> is_nucleotide("MWLK")
         False
-        >>> _is_nucleotide("ACG-T.NU")
+        >>> is_nucleotide("ACG-T.NU")
         True
-        >>> _is_nucleotide("")
+        >>> is_nucleotide("")
         True
     """
     nt_chars = set("ACGTUNacgtun-.")
@@ -128,7 +128,7 @@ def build_hxb2_map(
         raise ValueError(f"HxB2 sequence '{hxb2_id}' not found in alignment")
 
     if seq_type is None:
-        seq_type = "NT" if _is_nucleotide(hxb2_seq) else "AA"
+        seq_type = "NT" if is_nucleotide(hxb2_seq) else "AA"
 
     is_nt = seq_type == "NT"
 

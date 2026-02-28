@@ -10,8 +10,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from tpixel.fasta import read_fasta
-from tpixel.hxb2 import _is_nucleotide, build_hxb2_map, hxb2_col_labels, hxb2_regions
-from tpixel.models import Marker, Panel, SeqGroup
+from tpixel.hxb2 import build_hxb2_map, hxb2_col_labels, hxb2_regions, is_nucleotide
+from tpixel.models import Panel, SeqGroup
 from tpixel.pngs import find_pngs_markers, find_pngs_markers_nt
 
 
@@ -139,7 +139,7 @@ def hiv_panel(
 
     # Auto-detect sequence type from reference when not specified
     if seq_type is None:
-        seq_type = "NT" if _is_nucleotide(ref_seq) else "AA"
+        seq_type = "NT" if is_nucleotide(ref_seq) else "AA"
 
     hxb2_map = build_hxb2_map(seqs, hxb2_id, seq_type=seq_type)
     regions = hxb2_regions(hxb2_map)

@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import random
+import warnings
+
+import pytest
 
 from tpixel.fasta import fasta_panel, read_fasta
+from tpixel.hxb2 import is_nucleotide
 from tpixel.models import Marker, Panel, Region, SeqGroup
 from tpixel.renderer import render_panels
 
@@ -70,12 +74,8 @@ class TestRenderPanels:
         assert out.stat().st_size > 0
 
     def test_stacked_panels(self, write_fasta, output_dir):
-        f1 = write_fasta(
-            [("ref", "ACGTACGT"), ("s1", "ACCTACGT")], "group1.fasta"
-        )
-        f2 = write_fasta(
-            [("ref", "ACGTACGT"), ("s2", "ACGTACGA")], "group2.fasta"
-        )
+        f1 = write_fasta([("ref", "ACGTACGT"), ("s1", "ACCTACGT")], "group1.fasta")
+        f2 = write_fasta([("ref", "ACGTACGT"), ("s2", "ACGTACGA")], "group2.fasta")
         p1 = fasta_panel(f1)
         p2 = fasta_panel(f2)
         out = output_dir / "stacked_pixel.png"
@@ -333,7 +333,12 @@ class TestTitleAndStats:
 
         fasta_path = tmp_path / "hiv_test.fasta"
         lines = []
-        for name, seq in [("HxB2", hxb2), ("animal1_ref", ref), ("animal1_s1", s1), ("animal2_s1", s2)]:
+        for name, seq in [
+            ("HxB2", hxb2),
+            ("animal1_ref", ref),
+            ("animal1_s1", s1),
+            ("animal2_s1", s2),
+        ]:
             lines.append(f">{name}\n{seq}\n")
         fasta_path.write_text("".join(lines))
 
@@ -598,3 +603,94 @@ class TestNTRendering:
         path = write_fasta(seqs, "forced_nt.fasta")
         panel = hiv_panel(str(path), seq_type="NT")
         assert panel.seq_type == "NT"
+
+
+class TestErrorPaths:
+    """Test error handling and edge cases."""
+
+    def test_empty_fasta_raises(self, tmp_path):
+        path = tmp_path / "empty.fasta"
+        path.write_text("")
+        with pytest.raises(ValueError, match="No sequences"):
+            fasta_panel(str(path))
+
+    def test_hiv_panel_empty_fasta_raises(self, tmp_path):
+        from tpixel.hiv import hiv_panel
+
+        path = tmp_path / "empty.fasta"
+        path.write_text("")
+        with pytest.raises(ValueError, match="No sequences"):
+            hiv_panel(str(path))
+
+    def test_hiv_panel_missing_hxb2_raises(self, write_fasta):
+        from tpixel.hiv import hiv_panel
+
+        seqs = [("animal1_ref", "ACGTACGT"), ("animal1_s1", "ACCTACGT")]
+        path = write_fasta(seqs)
+        with pytest.raises(ValueError, match="HxB2.*not found"):
+            hiv_panel(str(path))
+
+    def test_hiv_panel_no_ref_raises(self, write_fasta):
+        from tpixel.hiv import hiv_panel
+
+        seqs = [("HxB2", "ACGTACGT"), ("s1", "ACCTACGT")]
+        path = write_fasta(seqs)
+        with pytest.raises(ValueError, match="No \\*_ref sequence"):
+            hiv_panel(str(path), ref_positions=None)
+
+    def test_ragged_sequences_warns(self, write_fasta):
+        seqs = [("ref", "ACGTACGT"), ("s1", "ACGT")]
+        path = write_fasta(seqs)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            panel = fasta_panel(path)
+            assert len(w) == 1
+            assert "unequal lengths" in str(w[0].message)
+        assert panel.total_cols == 8
+
+    def test_is_nucleotide_public(self):
+        assert is_nucleotide("ACGTACGT") is True
+        assert is_nucleotide("MWLK") is False
+        assert is_nucleotide("") is True
+
+
+class TestMultiPanelStacking:
+    """Verify multi-panel rendering produces a single stacked image."""
+
+    def test_stacked_panels_content(self, write_fasta, output_dir):
+        """Two panels should produce a larger image than either alone."""
+        f1 = write_fasta(
+            [("ref", "ACGTACGT"), ("s1", "ACCTACGT"), ("s2", "ACGTACGA")],
+            "stack1.fasta",
+        )
+        f2 = write_fasta(
+            [("ref", "ACGTACGT"), ("s3", "ACGT--GT"), ("s4", "A-GTACGT")],
+            "stack2.fasta",
+        )
+        p1 = fasta_panel(f1)
+        p2 = fasta_panel(f2)
+
+        single_out = output_dir / "single_for_compare.png"
+        render_panels([p1], str(single_out), dpi=150)
+        single_size = single_out.stat().st_size
+
+        stacked_out = output_dir / "stacked_verified.png"
+        render_panels([p1, p2], str(stacked_out), dpi=150)
+        stacked_size = stacked_out.stat().st_size
+
+        assert stacked_out.exists()
+        assert stacked_size > single_size
+
+    def test_three_panels(self, write_fasta, output_dir):
+        panels = []
+        for i in range(3):
+            f = write_fasta(
+                [("ref", "ACGTACGT"), (f"s{i}", "ACCTACGT")],
+                f"multi{i}.fasta",
+            )
+            panels.append(fasta_panel(f))
+
+        out = output_dir / "three_panels.png"
+        render_panels(panels, str(out), dpi=150)
+        assert out.exists()
+        assert out.stat().st_size > 0
