@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from tpixel.fasta import fasta_panel, read_fasta
 from tpixel.hiv import hiv_panel
+from tpixel.hxb2 import is_nucleotide
 from tpixel.models import Marker, Panel, Region, SeqGroup
 from tpixel.renderer import render_panels
 
@@ -19,6 +20,7 @@ __all__ = [
     "SeqGroup",
     "fasta_panel",
     "hiv_panel",
+    "is_nucleotide",
     "read_fasta",
     "render_panels",
 ]

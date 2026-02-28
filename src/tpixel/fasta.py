@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from tpixel.models import Panel
@@ -62,6 +63,14 @@ def fasta_panel(
     if not seqs:
         raise ValueError(f"No sequences in {path}")
 
+    lengths = {len(s) for _, s in seqs}
+    if len(lengths) > 1:
+        warnings.warn(
+            f"Sequences in {path} have unequal lengths {sorted(lengths)}; "
+            "expected a pre-aligned FASTA. Shorter sequences will be gap-padded.",
+            stacklevel=2,
+        )
+
     # Primary reference is the last position in ref_positions
     primary_idx = ref_positions[-1] - 1
     _ref_name, ref_seq = seqs[primary_idx]
@@ -105,5 +114,6 @@ def fasta_panel(
                 col_labels.append((i, str(ref_pos)))
 
     label = Path(path).stem
-    return Panel(label, ref_row, seq_rows, aln_len, col_labels,
-                 extra_ref_rows=extra_ref_rows or None)
+    return Panel(
+        label, ref_row, seq_rows, aln_len, col_labels, extra_ref_rows=extra_ref_rows or None
+    )

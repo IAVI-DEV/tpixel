@@ -28,16 +28,21 @@ def _expand_stdin(paths: list[str]) -> list[str]:
     return list(paths)
 
 
-def _auto_detect_hiv(fasta_path: str) -> bool:
+def _auto_detect_hiv(seqs: list[tuple[str, str]]) -> bool:
     """Check if alignment contains HxB2 and a ``*_ref`` sequence.
 
     Args:
-        fasta_path: Path to the aligned FASTA file.
+        seqs: Parsed (name, sequence) tuples from :func:`read_fasta`.
 
     Returns:
         ``True`` if both HxB2 and a ``*_ref`` sequence are present.
+
+    Examples:
+        >>> _auto_detect_hiv([("HxB2", "ACG"), ("animal1_ref", "ACG")])
+        True
+        >>> _auto_detect_hiv([("seq1", "ACG"), ("seq2", "ACG")])
+        False
     """
-    seqs = read_fasta(fasta_path)
     names = {n.split()[0] for n, _ in seqs}
     has_hxb2 = "HxB2" in names
     has_ref = any(n.endswith("_ref") for n in names)
@@ -54,9 +59,7 @@ def _auto_detect_hiv(fasta_path: str) -> bool:
     multiple=True,
     help="Aligned FASTA file(s) — each becomes a panel. Use '-' for stdin.",
 )
-@click.option(
-    "--columns", help="Column range for FASTA, 1-based inclusive (e.g. 1-120)."
-)
+@click.option("--columns", help="Column range for FASTA, 1-based inclusive (e.g. 1-120).")
 @click.option(
     "-o",
     "--output",
@@ -64,11 +67,12 @@ def _auto_detect_hiv(fasta_path: str) -> bool:
     show_default=True,
     help="Output image path.",
 )
+@click.option("--dpi", type=int, default=300, show_default=True, help="Image resolution.")
 @click.option(
-    "--dpi", type=int, default=300, show_default=True, help="Image resolution."
-)
-@click.option(
-    "--cell", type=float, default=None, help="Cell size in inches (default: 0.03)."
+    "--cell",
+    type=float,
+    default=None,
+    help="Cell size in inches (reserved for future layout modes).",
 )
 @click.option(
     "--hiv/--no-hiv",
@@ -111,12 +115,15 @@ def main(fasta, columns, output, dpi, cell, hiv, nt, ref_pos, title):
     panels = []
     col_start, col_end = None, None
     if columns:
-        parts = columns.replace(",", "").split("-")
-        col_start = int(parts[0])
-        col_end = int(parts[1]) if len(parts) > 1 else None
+        parts = columns.split("-")
+        if len(parts) != 2 or not parts[0].strip().isdigit() or not parts[1].strip().isdigit():
+            raise click.UsageError("--columns must be START-END (e.g. 1-120)")
+        col_start = int(parts[0].strip())
+        col_end = int(parts[1].strip())
 
     for fasta_path in fasta_paths:
-        use_hiv = hiv if hiv is not None else _auto_detect_hiv(fasta_path)
+        seqs = read_fasta(fasta_path)
+        use_hiv = hiv if hiv is not None else _auto_detect_hiv(seqs)
 
         if use_hiv:
             from tpixel.hiv import hiv_panel

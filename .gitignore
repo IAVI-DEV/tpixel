@@ -50,6 +50,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+# NOTE: tests/output/ is intentionally tracked — it contains example rendered
+# images so users can see output without running the test suite themselves.
 
 # Translations
 *.mo
